@@ -7,6 +7,7 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont
 import cv2
 import threading
 import requests
+import datetime
 
 class main_ui:
     '''
@@ -50,6 +51,8 @@ class main_ui:
         self.img_video_offline_streched=None
 
         self.loading_finished = True
+        self.start_time=[0,0,0,0]
+        self.current_time=[0,0,0,0]
 
 
 
@@ -145,7 +148,7 @@ class main_ui:
         video0_process.daemon = True
         video0_process.start()
         print("video_0 process started:", video0_process)
-        current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=0"
+        current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=1"
         #current_url = "rtmp://58.200.131.2:1935/livetv/cctv1hd"
         self.video_enable[1]=True
         video1_process=threading.Thread(target=self.video_loop,
@@ -240,10 +243,21 @@ class main_ui:
     def video_loop(self, video_th, panel, url, cam_id):
         print("process for video", video_th, "  ", url)
         cap = cv2.VideoCapture(url)
-        print("process for video", video_th, "  ", cap)
+        now_time = int(round(time.time()*1000))
+        self.start_time[video_th]=int(now_time)
+        print("process for video", video_th, "  ", cap, self.start_time[video_th])
         counter = 0
         previous_time = time.time()
         fps = 30
+        for i in range(1,100):
+            success, img = cap.read()
+            time.sleep(0.02)
+        milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
+        raw_time = int(milliseconds)
+        now_time = int(round(time.time() * 1000))
+        self.current_time[video_th] = self.start_time[video_th] + raw_time
+        dtime=self.current_time[video_th]-now_time
+        self.start_time[video_th]=self.start_time[video_th]-3*dtime   #每台相机延时不同，需要修正
 
         font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
         net_false_counter=0
@@ -255,7 +269,10 @@ class main_ui:
             success, img = cap.read()  # 从摄像头读取照片
             if success and img.size > 10000:
                 milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
-                raw_time=milliseconds
+                raw_time=int(milliseconds)
+                now_time = int(round(time.time() * 1000))
+                self.current_time[video_th]=self.start_time[video_th]+raw_time
+                milliseconds=self.current_time[video_th]
                 seconds = milliseconds // 1000
                 milliseconds = milliseconds % 1000
                 minutes = 0
@@ -268,7 +285,7 @@ class main_ui:
                     hours = minutes // 60
                     minutes = minutes % 60
 
-                print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds))
+                print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
                 # self.lock1.acquire()
                 net_false_counter=0
                 img = cv2.resize(img, (width, height))
@@ -276,6 +293,11 @@ class main_ui:
 
                 img_ = Image.fromarray(cv2img)  # 转成PIL
                 draw = ImageDraw.Draw(img_)  # 图片上打印
+                time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
+
+                draw.text((width - 300, 80), time_string, (0, 255, 0),
+                          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+
                 draw.text((width - 80, height - 20), 'FPS: ' + str(fps), (0, 255, 0),
                           font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
                 draw.text(( 50, height - 20), '位置: CAM' + str(cam_id)+'  '+url, (255, 255, 0), font=font)
@@ -305,7 +327,7 @@ class main_ui:
                     time.sleep(2)
                     cap = cv2.VideoCapture(url)
 
-            time.sleep(0.05)
+            time.sleep(0.01)
         cap.release()
 
 
