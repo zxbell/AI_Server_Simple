@@ -42,6 +42,8 @@ class main_ui:
         self.lock = [threading.RLock(), threading.RLock(), threading.RLock()]
         self.video_ready = [False, False, False]
         self.video_enable = [False, False, False]
+        self.que = []
+        self.que_time=[]
         self.img = [None, None, None]
         self.img_bak = [None, None, None]
         self.counter = 0
@@ -194,8 +196,24 @@ class main_ui:
             for i in range(2):
                 if self.lock[i].acquire():
                     if self.video_ready[i]:
-                        img.append(self.img[i].copy())
-                        self.img_bak[i]=self.img[i]
+                        if i==1 :
+                            if len(self.que)>=50: #延时显示
+                                img_pop=self.que.pop(0)
+                                time_pop=self.que_time.pop(0)
+                                draw = ImageDraw.Draw(img_pop)  # 图片上打印  此处可以绘制识别结果
+                                time_string = time.strftime("%Y-%m-%d %H:%M:%S",
+                                                            time.localtime(int(time_pop / 1000)))
+                                font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
+                                draw.text((width - 300, 160), time_string, (255, 255, 0),
+                                          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                img.append(img_pop)
+                                self.img_bak[i] = img_pop
+                            #else:
+                            #    img.append(self.img_video_offline_streched)
+                            #    self.img_bak[i] = self.img[i]
+                        else:
+                            img.append(self.img[i].copy())
+                            self.img_bak[i]=self.img[i]
                     else:
                         if self.img_bak[i] == None:
                             img.append(self.img_video_offline_streched)
@@ -249,8 +267,10 @@ class main_ui:
         counter = 0
         previous_time = time.time()
         fps = 30
-        for i in range(1,100):
+        for i in range(1,30):
             success, img = cap.read()
+            #if video_th ==1:
+            #    self.que.append(img)
             time.sleep(0.02)
         milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
         raw_time = int(milliseconds)
@@ -265,10 +285,11 @@ class main_ui:
             width = int(panel.winfo_width()/2)
             height = int(width *3 / 4)
             success, img = cap.read()
-            # cv2.waitKey(5)
+            cv2.waitKey(5)
             success, img = cap.read()  # 从摄像头读取照片
             if success and img.size > 10000:
                 milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
+                fps_ = cap.get(cv2.CAP_PROP_FPS)
                 raw_time=int(milliseconds)
                 now_time = int(round(time.time() * 1000))
                 self.current_time[video_th]=self.start_time[video_th]+raw_time
@@ -285,7 +306,7 @@ class main_ui:
                     hours = minutes // 60
                     minutes = minutes % 60
 
-                print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
+                #print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
                 # self.lock1.acquire()
                 net_false_counter=0
                 img = cv2.resize(img, (width, height))
@@ -308,6 +329,9 @@ class main_ui:
                 #            color= (255, 255, 0))
                 if self.lock[video_th].acquire():
                     self.img[video_th] = img_
+                    if video_th == 1:
+                        self.que.append(img_)
+                        self.que_time.append(self.current_time[video_th])
                     self.video_ready[video_th] = True
                     self.lock[video_th].release()
             else:
