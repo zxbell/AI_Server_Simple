@@ -6,6 +6,8 @@ import time
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 import cv2
 import threading
+import requests
+
 class main_ui:
     '''
     主窗口界面设计
@@ -123,6 +125,19 @@ class main_ui:
         display_process.start()
         print("display process started:", display_process)
         current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=1"
+        '''
+        try:
+            print(current_url, "checking")
+            r = requests.get(current_url)
+            if '200' in str(r):
+                print(current_url," --------------------------------------------active")
+            else:
+                print(current_url, " ********************************************inactive")
+                pass
+        except requests.exceptions.ConnectionError:
+            pass
+        '''
+        #current_url="rtmp://58.200.131.2:1935/livetv/dfhd"
         self.video_enable[0]=True
         video0_process=threading.Thread(target=self.video_loop,
                          args=(0, self.camera_label,
@@ -131,6 +146,7 @@ class main_ui:
         video0_process.start()
         print("video_0 process started:", video0_process)
         current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=0"
+        #current_url = "rtmp://58.200.131.2:1935/livetv/cctv1hd"
         self.video_enable[1]=True
         video1_process=threading.Thread(target=self.video_loop,
                          args=(1, self.camera_label,
@@ -238,6 +254,21 @@ class main_ui:
             # cv2.waitKey(5)
             success, img = cap.read()  # 从摄像头读取照片
             if success and img.size > 10000:
+                milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
+                raw_time=milliseconds
+                seconds = milliseconds // 1000
+                milliseconds = milliseconds % 1000
+                minutes = 0
+                hours = 0
+                if seconds >= 60:
+                    minutes = seconds // 60
+                    seconds = seconds % 60
+
+                if minutes >= 60:
+                    hours = minutes // 60
+                    minutes = minutes % 60
+
+                print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds))
                 # self.lock1.acquire()
                 net_false_counter=0
                 img = cv2.resize(img, (width, height))
