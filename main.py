@@ -6,6 +6,8 @@ import time
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 import cv2
 import threading
+import multiprocessing
+import socket
 import requests
 import datetime
 
@@ -55,6 +57,11 @@ class main_ui:
         self.loading_finished = True
         self.start_time=[0,0,0,0]
         self.current_time=[0,0,0,0]
+        self.ai_ip=['192.168.3.102','192.168.3.100']
+        self.cam_ip=['10.193.232.5','10.193.232.4']
+        self.ai_rec=[]
+        for i in range(len(self.ai_ip)):
+            self.ai_rec.append([])
 
 
 
@@ -121,7 +128,14 @@ class main_ui:
     def closeWindow(self):
         self.root.destroy()
         root.destroy()
-
+    def get_local_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            HOST = s.getsockname()[0]
+        finally:
+            s.close()
+        return HOST
     def callback_start_monitor(self):
         self.display_enable=True
         display_process = threading.Thread(target=self.display,
@@ -159,9 +173,57 @@ class main_ui:
         video1_process.daemon = True
         video1_process.start()
         print("video_1 process started:", video1_process)
+        self.ai_start=True
+        tcp_server_process=threading.Thread(target=self.tcp_server,
+                         args=())
+        tcp_server_process.daemon = True
+        tcp_server_process.start()
+        print("tcp_server_process started:", tcp_server_process)
+
+        
+        tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            tcp_client.connect(('192.168.3.100', 10086))
+            HOST=self.get_local_ip()
+            data='hostip_'+HOST+'_7788'
+            tcp_client.sendall(data.encode())
+            received = tcp_client.recv(4096)
+            print("Bytes Sent:     {}".format(data))
+            print("Bytes Received: {}".format(received))  # .decode()))
+            #tcp_client.close()
+            time.sleep(0.5)
+
+
+            #tcp_client.connect(('192.168.3.100', 10086))
+
+
+            data='start'
+            tcp_client.sendall(data.encode())
+            received = tcp_client.recv(4096)
+            print("Bytes Sent:     {}".format(data))
+            print("Bytes Received: {}".format(received))  # .decode()))
+            time.sleep(0.5)
+
+        finally:
+            tcp_client.close()
+
+
         return
 
     def callback_stop_monitor(self):
+        self.display_enable=False
+        self.ai_start = False
+        self.video_enable[0] = False
+        self.video_enable[1] = False
+        self.que.clear()
+        tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tcp_client.connect(('192.168.3.100', 10086))
+        data='stop'
+        tcp_client.sendall(data.encode())
+        received = tcp_client.recv(4096)
+        # print("Bytes Sent:     {}".format(data2))
+        print("Bytes Received: {}".format(received))  # .decode()))
+        time.sleep(0.5)
         return
 
     def layout_display_bind(self, Event=None):
@@ -206,6 +268,16 @@ class main_ui:
                                 font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
                                 draw.text((width - 300, 160), time_string, (255, 255, 0),
                                           font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                if len(self.ai_rec[i]) > 0:
+                                    draw.text((width - 300, 160), 'Warning', (255, 255, 0),
+                                              font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                    for j in range(len(self.ai_rec[i])):
+                                        if(len(self.ai_rec[i][j])>0):
+                                            xys=tuple(self.ai_rec[i][j])
+                                            #print(xys)
+                                            if(len(xys)==4):
+                                                draw.rectangle(xy=xys, fill=None, outline=(255, 0, 0), width=6)
+                                    self.ai_rec[i]=[]
                                 img.append(img_pop)
                                 self.img_bak[i] = img_pop
                             #else:
@@ -353,6 +425,69 @@ class main_ui:
 
             time.sleep(0.01)
         cap.release()
+
+    def tcp_server(self):
+        # 创建socket
+        tcp_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # 本地信息
+        local_ip=self.get_local_ip()
+        address = (local_ip, 7788)
+        print(address)
+        # 绑定
+        tcp_server_socket.bind(address)
+        # 监听多个端口
+        tcp_server_socket.listen(128)
+        # 同步锁
+        # R = threading.Lock()
+        while self.ai_start:
+            # 阻塞等待新的客户端连接
+            print("Waiting for AI.....")
+            client_socket, clientAddr = tcp_server_socket.accept()
+
+            # 客户端连接成功后，调用打开视频流
+            print(str(clientAddr[0]) + "出现疑似火警！")
+            print("IP:" + str(clientAddr[0]) + " Port:" + str(clientAddr[1]))
+
+            # 开一个线程从FPGA端不断接收数据
+            # _thread.start_new_thread(recv, (client_socket,))
+
+            # 多进程
+            p = threading.Thread(target=self.get_warning_info, args=(client_socket, clientAddr))
+            p.daemon = True
+            p.start()
+            time.sleep(0.1)
+            # print(p.pid)
+        tcp_server_socket.shutdown(how='SHUT_RDWR')
+        tcp_server_socket.close()
+
+        time.sleep(1)
+
+    def get_warning_info(self,client_socket, clientAddr):
+        try:
+            while True:
+                recv_data = client_socket.recv(1024)  # 接收1024个字节
+                #print(recv_data)
+                if clientAddr[0] in self.ai_ip:
+                    index=self.ai_ip.index(clientAddr[0])
+                    #print("index:",index)
+                    if True:#self.lock[index].acquire():
+                        self.ai_rec[index]=[]
+                        x = recv_data.decode('gbk').split("_")
+                        if len(x)>0 and len(x) %4 ==0:
+                            self.warning = True
+                            for i in range(int(len(x) / 4)):
+                                self.ai_rec[index].append([])
+                                for j in range(4):
+                                    #print(i, j, i * 4 + j)
+                                    self.ai_rec[index][i].append(int(x[i * 4 + j]))
+                            print(self.ai_rec[index])
+                            #self.lock[index].release()
+                if recv_data==b'':
+                    break
+        except:
+            pass
+
+
 
 
 if __name__ == '__main__':
