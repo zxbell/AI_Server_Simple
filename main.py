@@ -57,12 +57,13 @@ class main_ui:
         self.loading_finished = True
         self.start_time=[0,0,0,0]
         self.current_time=[0,0,0,0]
-        self.ai_ip=['192.168.3.102','192.168.3.100']
+        self.ai_ip=['192.168.3.102:7788','192.168.3.100:7788']
         self.cam_ip=['10.193.232.5','10.193.232.4']
+        self.cam_res=[]
         self.ai_rec=[]
         for i in range(len(self.ai_ip)):
             self.ai_rec.append([])
-
+        self.tcp_server_process = None
 
 
     def ui_menu(self):
@@ -136,6 +137,57 @@ class main_ui:
         finally:
             s.close()
         return HOST
+
+    def IsOpen(ip, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect((ip, int(port)))
+            s.shutdown(2)
+            return True
+        except:
+            return False
+
+    def ai_process_start(self,i):
+        tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        [ip, port] = self.ai_ip[i].split(":")
+        print(ip, port)
+        is_connected = False
+        HOST = self.get_local_ip()
+        HOST="hostip_192.168.3.153_7788"
+        try:
+            tcp_client.connect((ip, 10086))  # 10086是所有AI模块接收控制的服务端口
+            is_connected = True
+            data = HOST
+            tcp_client.sendall(data.encode())  # 发送本机的报警处理服务端口
+            received = tcp_client.recv(4096)
+            print("Bytes Sent:     {}".format(data))
+            print("Bytes Received: {}".format(received))  # .decode()))
+            tcp_client.sendall(('camip_' + self.cam_ip[i]).encode())  # 发送AI配对的cam的ip
+            received = tcp_client.recv(4096)  # 接收cam的分辨率
+            print("Bytes Sent:     {}".format(data))
+            print("Bytes Received: {}".format(received))  # .decode()))
+            x = received.decode('gbk').split("_")
+            if len(x) == 3:
+                if x[0] == 'resolution':
+                    self.cam_res.append([int(x[1]), int(x[2])])
+                    time.sleep(0.5)
+                    data = 'start'
+                    tcp_client.sendall(data.encode())
+                    received = tcp_client.recv(4096)
+                    print("Bytes Sent:     {}".format(data))
+                    print("Bytes Received: {}".format(received))  # .decode()))
+                    time.sleep(0.5)
+                    print(self.ai_ip[i], " connect succeed")
+        except Exception as e:  # 连接失败
+            print(e, self.ai_ip[i], " connect failed")
+            if is_connected:
+                tcp_client.shutdown(2)
+                tcp_client.close()
+            time.sleep(2)
+        finally:
+            tcp_client.close()
+            time.sleep(2)
+
     def callback_start_monitor(self):
         self.display_enable=True
         display_process = threading.Thread(target=self.display,
@@ -174,41 +226,29 @@ class main_ui:
         video1_process.start()
         print("video_1 process started:", video1_process)
         self.ai_start=True
-        tcp_server_process=threading.Thread(target=self.tcp_server,
-                         args=())
-        tcp_server_process.daemon = True
-        tcp_server_process.start()
-        print("tcp_server_process started:", tcp_server_process)
+        if self.tcp_server_process == None :
 
-        
-        tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            tcp_client.connect(('192.168.3.100', 10086))
-            HOST=self.get_local_ip()
-            data='hostip_'+HOST+'_7788'
-            tcp_client.sendall(data.encode())
-            received = tcp_client.recv(4096)
-            print("Bytes Sent:     {}".format(data))
-            print("Bytes Received: {}".format(received))  # .decode()))
-            #tcp_client.close()
-            time.sleep(0.5)
+            self.tcp_server_process=threading.Thread(target=self.tcp_server,
+                             args=())
+            self.tcp_server_process.daemon = True
+            self.tcp_server_process.start()
+            print("tcp_server_process started:", self.tcp_server_process)
+        else:
+            if self.tcp_server_process.is_alive() == False:
+                self.tcp_server_process = threading.Thread(target=self.tcp_server,
+                                                           args=())
+                self.tcp_server_process.daemon = True
+                self.tcp_server_process.start()
+                print("tcp_server_process restarted:", self.tcp_server_process)
 
 
-            #tcp_client.connect(('192.168.3.100', 10086))
 
-
-            data='start'
-            tcp_client.sendall(data.encode())
-            received = tcp_client.recv(4096)
-            print("Bytes Sent:     {}".format(data))
-            print("Bytes Received: {}".format(received))  # .decode()))
-            time.sleep(0.5)
-
-        finally:
-            tcp_client.close()
-
-
+        for i in range(len(self.ai_ip)):
+            p=threading.Thread(target=self.ai_process_start,args=(i,))
+            p.daemon = True
+            p.start()
         return
+
 
     def callback_stop_monitor(self):
         self.display_enable=False
@@ -224,7 +264,7 @@ class main_ui:
         # print("Bytes Sent:     {}".format(data2))
         print("Bytes Received: {}".format(received))  # .decode()))
         time.sleep(0.5)
-        return
+
 
     def layout_display_bind(self, Event=None):
         #print(self.root.winfo_width(), self.root.winfo_height())
@@ -457,19 +497,26 @@ class main_ui:
             p.start()
             time.sleep(0.1)
             # print(p.pid)
+
         tcp_server_socket.shutdown(how='SHUT_RDWR')
         tcp_server_socket.close()
+        print("tcp_server_socket closed")
 
         time.sleep(1)
 
     def get_warning_info(self,client_socket, clientAddr):
-        try:
-            while True:
-                recv_data = client_socket.recv(1024)  # 接收1024个字节
-                #print(recv_data)
-                if clientAddr[0] in self.ai_ip:
-                    index=self.ai_ip.index(clientAddr[0])
-                    #print("index:",index)
+        is_matched = False
+        for id in range(len(self.ai_ip)):  #寻找当前通讯ip在ai_ip中的位置
+            [ip, port] = self.ai_ip[id].split(":")
+            if clientAddr[0] == ip:
+                is_matched=True
+                index=id
+        print(is_matched,index)
+        if is_matched:
+            try:
+                while True:
+                    recv_data = client_socket.recv(1024)  # 接收1024个字节
+                    #print(recv_data)
                     if True:#self.lock[index].acquire():
                         self.ai_rec[index]=[]
                         x = recv_data.decode('gbk').split("_")
@@ -482,10 +529,10 @@ class main_ui:
                                     self.ai_rec[index][i].append(int(x[i * 4 + j]))
                             print(self.ai_rec[index])
                             #self.lock[index].release()
-                if recv_data==b'':
-                    break
-        except:
-            pass
+                    if recv_data==b'':
+                        break
+            except:
+                pass
 
 
 
