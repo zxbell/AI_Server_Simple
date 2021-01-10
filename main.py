@@ -46,6 +46,8 @@ class main_ui:
         self.video_enable = [False, False, False]
         self.que = []
         self.que_time=[]
+        self.cam1_que = []
+        self.cam2_que = []
         self.img = [None, None, None]
         self.img_bak = [None, None, None]
         self.counter = 0
@@ -58,6 +60,7 @@ class main_ui:
         self.start_time=[0,0,0,0]
         self.current_time=[0,0,0,0]
         self.ai_ip=['192.168.3.102:7788','192.168.3.100:7788']
+        self.ai_status=[False,False]
         self.cam_ip=['10.193.232.5','10.193.232.4']
         self.cam_res=[]
         self.ai_rec=[]
@@ -138,14 +141,21 @@ class main_ui:
             s.close()
         return HOST
 
-    def IsOpen(ip, port):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            s.connect((ip, int(port)))
-            s.shutdown(2)
-            return True
-        except:
-            return False
+    def IsOpen(self, i, ip, port):
+        while True:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                s.connect((ip, int(port)))
+                self.ai_status[i] = True
+                s.shutdown(2)
+                #return True
+            except:
+                #return False
+                print(ip,":",port," lost!......")
+                self.ai_status[i]=False
+
+            time.sleep(2)
+
 
     def ai_process_start(self,i):
         tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -180,12 +190,19 @@ class main_ui:
                     print(self.ai_ip[i], " connect succeed")
         except Exception as e:  # 连接失败
             print(e, self.ai_ip[i], " connect failed")
+            self.ai_status[i]= False
             if is_connected:
                 tcp_client.shutdown(2)
                 tcp_client.close()
             time.sleep(2)
         finally:
             tcp_client.close()
+            self.ai_status[i] = True
+            aidetect_process = threading.Thread(target=self.IsOpen,
+                                               args=(i, ip, 10086))
+            aidetect_process.daemon = True
+            aidetect_process.start()
+            print("aidetect process started:", aidetect_process)
             time.sleep(2)
 
     def callback_start_monitor(self):
@@ -257,13 +274,18 @@ class main_ui:
         self.video_enable[1] = False
         self.que.clear()
         tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_client.connect(('192.168.3.100', 10086))
-        data='stop'
-        tcp_client.sendall(data.encode())
-        received = tcp_client.recv(4096)
-        # print("Bytes Sent:     {}".format(data2))
-        print("Bytes Received: {}".format(received))  # .decode()))
-        time.sleep(0.5)
+        try:
+            tcp_client.connect(('192.168.3.100', 10086))
+            data='stop'
+            tcp_client.sendall(data.encode())
+            received = tcp_client.recv(4096)
+            # print("Bytes Sent:     {}".format(data2))
+            print("Bytes Received: {}".format(received))  # .decode()))
+            time.sleep(0.5)
+        except Exception as e:
+            print(e)
+            tcp_client.close()
+
 
 
     def layout_display_bind(self, Event=None):
@@ -292,33 +314,55 @@ class main_ui:
                 (int(self.camera_label.winfo_width())), int(self.camera_label.winfo_height())))
     def display(self, master, panel):
         # print("self.display_enable",self.display_enable)
-         if self.display_enable:
+        width=panel.winfo_width()
+        height=panel.winfo_height()
+
+        y_ratio=height/144
+        x_ratio = y_ratio
+
+
+        if self.display_enable:
             # time.sleep(0.01)
             img = []
             for i in range(2):
                 if self.lock[i].acquire():
                     if self.video_ready[i]:
                         if i==1 :
-                            if len(self.que)>=50: #延时显示
+                            if len(self.que)>=2: #延时显示
                                 img_pop=self.que.pop(0)
                                 time_pop=self.que_time.pop(0)
                                 draw = ImageDraw.Draw(img_pop)  # 图片上打印  此处可以绘制识别结果
                                 time_string = time.strftime("%Y-%m-%d %H:%M:%S",
                                                             time.localtime(int(time_pop / 1000)))
                                 font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
-                                draw.text((width - 300, 160), time_string, (255, 255, 0),
-                                          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
-                                if len(self.ai_rec[i]) > 0:
-                                    draw.text((width - 300, 160), 'Warning', (255, 255, 0),
+                                #draw.text((int(width/2), int(height/2)), time_string, (255, 255, 0),
+                                #draw.text((int(width/4), int(height/4)), time_string, (255, 255, 0),
+                                #          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                if self.ai_status[i] == True:
+                                    draw.text((int(width/4)-200, 30), 'AI: 在线', (255, 255, 0), font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+
+                                else:
+                                    draw.text((int(width/4)-200, 30), 'AI: 掉线', (255, 0, 0),
                                               font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                if len(self.ai_rec[i]) > 0:
+                                    draw.text((int(width/4), int(height/2)), 'Warning', (255, 255, 0),
+                                              font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                    xy=[0,0,0,0]
                                     for j in range(len(self.ai_rec[i])):
+                                        for k in range(2):
+                                            xy[k*2]=int(self.ai_rec[i][j][k*2]*x_ratio)
+                                            xy[k * 2+1] = int(self.ai_rec[i][j][k*2+1] * y_ratio)
+                                        #xy[2]=xy[2]-xy[0]
+                                        #xy[3]=xy[3]-xy[1]
+                                        print(xy)
                                         if(len(self.ai_rec[i][j])>0):
-                                            xys=tuple(self.ai_rec[i][j])
+                                            xys=tuple(xy)
                                             #print(xys)
                                             if(len(xys)==4):
                                                 draw.rectangle(xy=xys, fill=None, outline=(255, 0, 0), width=6)
                                     self.ai_rec[i]=[]
                                 img.append(img_pop)
+
                                 self.img_bak[i] = img_pop
                             #else:
                             #    img.append(self.img_video_offline_streched)
@@ -397,7 +441,7 @@ class main_ui:
             width = int(panel.winfo_width()/2)
             height = int(width *3 / 4)
             success, img = cap.read()
-            cv2.waitKey(5)
+            #cv2.waitKey(5)
             success, img = cap.read()  # 从摄像头读取照片
             if success and img.size > 10000:
                 milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
@@ -442,6 +486,8 @@ class main_ui:
                 if self.lock[video_th].acquire():
                     self.img[video_th] = img_
                     if video_th == 1:
+                        if len(self.que) > 3:
+                            self.que.clear()
                         self.que.append(img_)
                         self.que_time.append(self.current_time[video_th])
                     self.video_ready[video_th] = True
@@ -463,7 +509,7 @@ class main_ui:
                     time.sleep(2)
                     cap = cv2.VideoCapture(url)
 
-            time.sleep(0.01)
+            #time.sleep(0.01)
         cap.release()
 
     def tcp_server(self):
@@ -513,12 +559,14 @@ class main_ui:
                 index=id
         print(is_matched,index)
         if is_matched:
+            self.ai_rec[index] = []
             try:
                 while True:
                     recv_data = client_socket.recv(1024)  # 接收1024个字节
                     #print(recv_data)
                     if True:#self.lock[index].acquire():
-                        self.ai_rec[index]=[]
+                        if(len(self.ai_rec[index])>5):
+                            self.ai_rec[index].pop(0)
                         x = recv_data.decode('gbk').split("_")
                         if len(x)>0 and len(x) %4 ==0:
                             self.warning = True
@@ -526,13 +574,14 @@ class main_ui:
                                 self.ai_rec[index].append([])
                                 for j in range(4):
                                     #print(i, j, i * 4 + j)
-                                    self.ai_rec[index][i].append(int(x[i * 4 + j]))
+                                    self.ai_rec[index][i].append(float(x[i * 4 + j]))
                             print(self.ai_rec[index])
                             #self.lock[index].release()
                     if recv_data==b'':
                         break
-            except:
-                pass
+            except Exception as e:
+                print(e)
+
 
 
 
