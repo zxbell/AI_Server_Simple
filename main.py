@@ -218,6 +218,7 @@ class main_ui:
         display_process.daemon = True
         display_process.start()
         print("display process started:", display_process)
+        #current_url = "rtmp://58.200.131.2:1935/livetv/cctv1hd"
         current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=1"
         '''
         try:
@@ -240,7 +241,7 @@ class main_ui:
         video0_process.start()
         print("video_0 process started:", video0_process)
         current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=1"
-        #current_url = "rtmp://58.200.131.2:1935/livetv/cctv1hd"
+
         self.video_enable[1]=True
         video1_process=threading.Thread(target=self.video_loop,
                          args=(1, self.camera_label,
@@ -446,9 +447,10 @@ class main_ui:
         width = int(panel.winfo_width() / 2)
         height = int(width * 3 / 4)
         success, img_prev = cap.read()
+        img_prev = cv2.resize(img_prev, (width, height))
         img_y=img_prev.shape[0]
         img_x=img_prev.shape[1]
-        img_prev[0:int(img_y/10),int(img_x*2/3):img_x]=0
+        #img_prev[0:int(img_y/10),int(img_x*2/3):img_x]=0
         #cv2.imshow("time",img_prev)
         #cv2.waitKey(1)
         #print(img_x,img_y)
@@ -465,6 +467,8 @@ class main_ui:
         while self.video_enable[video_th]:
 
 
+            success, img_now = cap.read()  # 从摄像头读取照片
+            cv2.waitKey(1)
             success, img_now = cap.read()  # 从摄像头读取照片
             if success and img_now.size > 10000:
                 '''
@@ -489,10 +493,11 @@ class main_ui:
                 #print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
                 # self.lock1.acquire()
                 net_false_counter=0
+                img_now = cv2.resize(img_now, (width, height))
                 cv2img = cv2.cvtColor(img_now, cv2.COLOR_BGR2RGB)  # cv2和PIL中颜色的hex码的储存顺序不同
-                img_now[0:int(img_y / 10), int(img_x * 2 / 3):img_x] = 0
+                #img_now[0:int(img_y / 10), int(img_x * 2 / 3):img_x] = 0
                 img = cv2.absdiff(img_now, img_prev)
-
+                cv2.imshow("Image", img)
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
                 cv2.threshold(img, 20, 255, cv2.THRESH_BINARY,dst=img)
 
@@ -500,10 +505,11 @@ class main_ui:
                 img = cv2.dilate(img, kernel)
                 contours, hierarchy = cv2.findContours(img,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
                 lens=len(contours)
+                #print(lens,NonZero)
                 center_list=[]
                 rect_list=[]
 
-                if  lens>0 and lens<5 and NonZero>10:  #有效目标出现
+                if  lens>0 and lens<10 and NonZero>10:  #有效目标出现
                     object_catched_counter=object_catched_counter+1
                     object_lost_counter = 0
                     if object_catched_counter>5:        #有效目标出现超过5帧
@@ -527,7 +533,7 @@ class main_ui:
                         M = cv2.moments(c)
                         cX = int(M["m10"] / M["m00"])
                         cY = int(M["m01"] / M["m00"])
-                        print(cX,cY)
+                        #print(cX,cY)
                         center_list.append([cX, cY])
                         x= cX-int(target_x/2)
                         if x<0:
@@ -544,17 +550,20 @@ class main_ui:
                             target_win.append([x, y, target_x, target_y])
                         else:
                             xs, ys, ws, hs = cv2.boundingRect(c)
-                            if ws>5 or hs >5: #轮廓较大
+                            if ws<target_x and hs <target_y and (ws>5 or hs >5): #轮廓较大
                                 target_win_prev=target_win.copy()
 
                                 overlaped=False
                                 for r in target_win_prev:
-                                    if not(xs<r[0] or xs+ws>r[0]+r[2] or ys<r[1] or ys+hs> r[3]):
+                                    if xs>=r[0] and xs+ws<=r[0]+r[2] and ys>=r[1] and ys+hs<= r[1]+r[3]:
                                         overlaped = True
                                         break
                                 if overlaped is False:
+                                    if len(target_win)>5:
+                                        break
                                     print(xs, ys, ws, hs, len(target_win), target_win)
                                     target_win.append([x, y, target_x, target_y])
+
                     for r in target_win:
                         cv2.rectangle(cv2img, (r[0], r[1]), (r[0] + target_x, r[1] + target_y), (0, 0, 255), 1)
                     #for center in center_list:
@@ -564,10 +573,10 @@ class main_ui:
                 #cv2.drawContours(cv2img, contours, -1, color=(0, 0, 255), thickness=3, maxLevel=2)
 
 
-                #cv2.imshow("Image", cv2img)
 
 
-                cv2img = cv2.resize(cv2img, (width, height))
+
+
 
                 img_ = Image.fromarray(cv2img)  # 转成PIL
 
@@ -614,8 +623,8 @@ class main_ui:
                     time.sleep(2)
                     cap = cv2.VideoCapture(url)
                 success, img = cap.read()
-
-            #cv2.waitKey(1)
+            #img_prev = img_now
+            cv2.waitKey(1)
         cap.release()
 
     def video_loop(self, video_th, panel, url, cam_id):
