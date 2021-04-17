@@ -467,6 +467,7 @@ class main_ui:
         object_catched_prev = False
         target_win = []
         fog_possible=False #低浓度雾
+        bin_threshold_prev=20
         while self.video_enable[video_th]:
 
 
@@ -474,27 +475,7 @@ class main_ui:
             cv2.waitKey(1)
             success, img_now = cap.read()  # 从摄像头读取照片
             if success and img_now.size > 10000:
-                '''
-                milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
-                fps_ = cap.get(cv2.CAP_PROP_FPS)
-                raw_time=int(milliseconds)
-                now_time = int(round(time.time() * 1000))
-                self.current_time[video_th]=self.start_time[video_th]+raw_time
-                milliseconds=self.current_time[video_th]
-                seconds = milliseconds // 1000
-                milliseconds = milliseconds % 1000
-                minutes = 0
-                hours = 0
-                if seconds >= 60:
-                    minutes = seconds // 60
-                    seconds = seconds % 60
 
-                if minutes >= 60:
-                    hours = minutes // 60
-                    minutes = minutes % 60
-                '''
-                #print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
-                # self.lock1.acquire()
                 net_false_counter=0
 
                 cv2img = cv2.cvtColor(img_now, cv2.COLOR_BGR2RGB)  # cv2和PIL中颜色的hex码的储存顺序不同
@@ -508,31 +489,38 @@ class main_ui:
 
                 #maxhist = np.argmax(hist_v)+10
                 max_level=max(max(img.tolist()))
-                bin_threshold = int(max_level * 0.8)
+                bin_threshold = int(max_level * 0.5)
+                if bin_threshold>bin_threshold_prev+10:
+                    bin_threshold=bin_threshold_prev+10
+                elif bin_threshold<bin_threshold_prev-10:
+                    bin_threshold = bin_threshold_prev - 10
+                else:
+                    bin_threshold = bin_threshold_prev
                 if bin_threshold < 20:
                     bin_threshold=20
                     fog_possible=True
                 else:
                     fog_possible=False
+                bin_threshold_prev=bin_threshold
                 #print(bin_threshold,max_level,fog_possible)
-
                 cv2.threshold(img, bin_threshold, 255, cv2.THRESH_BINARY,dst=img)
 
                 img = cv2.medianBlur(img, 5)
                 NonZero=cv2.countNonZero(img)
                 img = cv2.dilate(img, kernel)
-
+                img_dis = img.copy()
+                cv2.putText(cv2img,"Max:"+str(max_level)+"Thrd:"+str(bin_threshold),(50,50),cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
                 contours, hierarchy = cv2.findContours(img,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
                 cv2.drawContours(img, contours, -1, color=(127, 127, 127), thickness=3, maxLevel=5)
-
+                #以下部分为处理ROI的算法
                 lens=len(contours)
                 #print(lens,NonZero)
                 center_list=[]
                 rect_list=[]
-                if NonZero>warning_threshold:
+                if NonZero>warning_threshold:   #运动剧烈或照明条件突变，不用AI识别，直接报警现场异常
                     object_lost_counter = 10
                     object_catched_counter = 0
-                    #不用AI识别，直接报警现场异常
+
                 else:
                     if  lens>0 and lens<50 and NonZero>50:  #有效目标出现
                         object_catched_counter=object_catched_counter+1
@@ -553,7 +541,7 @@ class main_ui:
                         max_h=-1000
                         max_win_th=-1
                         c_contour=[]
-                        if lens > 3:  #如果是多个分散的轮廓，用各轮廓的中心重洗组合，合并一个完整的矩形框
+                        if lens >= 3:  #如果是多个分散的轮廓，用各轮廓的中心重洗组合，合并一个完整的矩形框
                             for c in contours:
                                 # compute the center of the contour
                                 M = cv2.moments(c)
@@ -567,108 +555,32 @@ class main_ui:
 
                             [xs,ys,ws,hs]=funcs.island_remove([xs,ys,ws,hs],c_contour[0])
                             cv2.rectangle(img, (xs, ys), (xs+ws, ys + hs), (200, 200, 200), 2)
-
-                            x_coe=img_x/ws/10  #矩形越小外扩越大，最大扩5倍
-                            if x_coe>5:
-                                x_coe=5
-                            wsn=int( ws * (1+x_coe-0.1)) #新窗口尺寸
-                            y_coe = img_y / hs / 10
-                            if y_coe>5:
-                                y_coe=5
-                            hsn =int( hs * (1+y_coe-0.1))
-                            rec_x = xs - int((wsn-ws)/2) #中心平移对准
-                            if rec_x < 0:
-                                rec_x = 0
-                            if rec_x + wsn  > img_x:
-                                rec_x = img_x - wsn
-                            rec_y = ys - int((hsn-hs) / 2)
-                            if rec_y < 0:
-                                rec_y = 0
-                            if rec_y + hsn  > img_y:
-                                rec_y = img_y - hsn
-                            cv2.rectangle(img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                            [rec_x,rec_y,wsn,hsn]=funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
+                            cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                            cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
 
 
-                        else:
+                        elif lens==2:
+                            # 如果是2个轮廓，分别计算单个轮廓的尺寸
+                            # 如果单个尺寸大于177*133的话直接输出；
+                            # 否则与另一个合并，如果非孤立轮廓，合并后的尺寸大于
                             for c in contours:
                                 M = cv2.moments(c)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])
                                 xs, ys, ws, hs = cv2.boundingRect(c)
-                                x = cX - int(ws / 2)
-                                if x < 0:
-                                    x = 0
-                                if x + ws * 2 > img_x:
-                                    x = img_x - ws * 2
-                                y = cY - int(hs / 2)
-                                if y < 0:
-                                    y = 0
-                                if y + hs * 2 > img_y:
-                                    y = img_y - hs * 2
+                                [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
+                                cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                                cv2.rectangle(cv2img,(rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                        elif lens==1:
+                            #如果是一个轮廓，直接放大后输出
+                            xs, ys, ws, hs = cv2.boundingRect(contours[0])
+                            [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
+                            cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                            cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                        else:
+                            continue
 
-                                if len(target_win) == 0:
-                                    target_win.append([x, y, ws * 2, hs * 2])
-                                else:
-
-                                    if ws < target_x and hs < target_y and (ws > 5 or hs > 5):  # 轮廓较大
-                                        target_win_prev = target_win.copy()
-
-                                        overlaped = False
-                                        for r in target_win_prev:
-                                            if xs >= r[0] and xs + ws <= r[0] + r[2] and ys >= r[1] and ys + hs <= r[
-                                                1] + r[3]:
-                                                overlaped = True
-                                                break
-                                        if overlaped is False:
-                                            if len(target_win) > 5:
-                                                break
-                                            print(xs, ys, ws, hs, len(target_win), target_win)
-                                            target_win.append([x, y, ws * 2, hs * 2])
-                            print(lens, NonZero)
-                            for r in target_win:
-                                cv2.rectangle(cv2img, (r[0], r[1]), (r[0] + ws, r[1] + hs), (0, 0, 255), 1)
-
-                        '''
-                        for c in contours:
-                            # compute the center of the contour
-                            M = cv2.moments(c)
-                            cX = int(M["m10"] / M["m00"])
-                            cY = int(M["m01"] / M["m00"])
-                            #print(cX,cY)
-                            center_list.append([cX, cY])
-                            xs, ys, ws, hs = cv2.boundingRect(c)
-                            x= cX-int(ws/2)
-                            if x<0:
-                                x=0
-                            if x+ws*2> img_x:
-                                x=img_x-ws*2
-                            y=cY-int(hs/2)
-                            if y<0:
-                                y=0
-                            if y+target_y> img_y:
-                                y=img_y-hs*2
-
-                            if len(target_win) == 0:
-                                target_win.append([x, y, ws*2, hs*2])
-                            else:
-
-                                if ws<target_x and hs <target_y and (ws>5 or hs >5): #轮廓较大
-                                    target_win_prev=target_win.copy()
-
-                                    overlaped=False
-                                    for r in target_win_prev:
-                                        if xs>=r[0] and xs+ws<=r[0]+r[2] and ys>=r[1] and ys+hs<= r[1]+r[3]:
-                                            overlaped = True
-                                            break
-                                    if overlaped is False:
-                                        if len(target_win)>5:
-                                            break
-                                        print(xs, ys, ws, hs, len(target_win), target_win)
-                                        target_win.append([x, y, ws*2, hs*2])
-                        print(lens, NonZero)
-                        for r in target_win:
-                            cv2.rectangle(cv2img, (r[0], r[1]), (r[0] + ws, r[1] + hs), (0, 0, 255), 1)
-                        '''
 
 
                 #cv2.drawContours(cv2img, contours, -1, color=(0, 0, 255), thickness=3, maxLevel=2)
@@ -705,7 +617,7 @@ class main_ui:
                     self.video_ready[video_th] = False
                 net_false_counter=net_false_counter+1
             counter = counter + 1
-            cv2.imshow("Image", img)
+            cv2.imshow("Image", img_dis)
             if counter == 30:
 
                 img_prev = img_now

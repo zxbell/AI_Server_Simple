@@ -8,9 +8,31 @@ def distance(pt1,pt2):
     p3 = p2 - p1
     p4 = math.hypot(p3[0], p3[1])
     return p4
+
+def rec_extend_auto(xs,ys,ws,hs,img_x,img_y):
+    x_coe = img_x / ws / 10  # 矩形越小外扩越大，最大扩8倍
+    if x_coe > 8:
+        x_coe = 8
+    wsn = int(ws * (1 + x_coe - 0.1))  # 新窗口尺寸
+    y_coe = img_y / hs / 10
+    if y_coe > 8:
+        y_coe = 8
+    hsn = int(hs * (1 + y_coe - 0.1))
+    rec_x = xs - int((wsn - ws) / 2)  # 中心平移对准
+    if rec_x < 0:
+        rec_x = 0
+    if rec_x + wsn > img_x:
+        rec_x = img_x - wsn
+    rec_y = ys - int((hsn - hs) / 2)
+    if rec_y < 0:
+        rec_y = 0
+    if rec_y + hsn > img_y:
+        rec_y = img_y - hsn
+    return [rec_x,rec_y,wsn,hsn]
+
 def island_remove(rec,c_contour):
     #contour=c_contour.tolist()
-    points_4=[[],[],[],[]]  #对应4个象限
+    points_4=[[],[],[],[]]  #对应4个象限中存在的点序号
     center_x=rec[0]+rec[2]/2
     center_y=rec[1]+rec[3]/2
     contour_n=[]
@@ -35,15 +57,15 @@ def island_remove(rec,c_contour):
             else:
                 points_4[3].append(index)
         index=index+1
-    c_contour_list = c_contour.tolist()
+    c_contour_list = c_contour.tolist() #nparray转成list方便处理
     c_contour_list_new=[]
     remove_point_th=[]
-    for p in points_4:
-        if len(p)>1 : #象限里不是一个孤立点
+    for p in points_4: #4个象限依次处理
+        if len(p)>2 : #象限里不是一个孤立点，为有效点，否则删除
             for index in p:
-                c_contour_list_new.append(c_contour_list[index])
+                c_contour_list_new.append(c_contour_list[index]) #将该点添加到新list中
     c_contour=[]
-    c_contour.append(np.array(c_contour_list_new))
+    c_contour.append(np.array(c_contour_list_new)) #格式转化
     if len(c_contour[0])>3:
         xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
         rec = [xs,ys,ws,hs]
