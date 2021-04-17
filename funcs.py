@@ -8,6 +8,52 @@ def distance(pt1,pt2):
     p3 = p2 - p1
     p4 = math.hypot(p3[0], p3[1])
     return p4
+def island_remove(rec,c_contour):
+    #contour=c_contour.tolist()
+    points_4=[[],[],[],[]]  #对应4个象限
+    center_x=rec[0]+rec[2]/2
+    center_y=rec[1]+rec[3]/2
+    contour_n=[]
+    index=0
+    for r in c_contour:
+        if r[0][0]-center_x>=0:
+            x_sign=True
+        else:
+            x_sign=False
+        if r[0][1]-center_y>=0:
+            y_sign=True
+        else:
+            y_sign=False
+        if x_sign:
+            if y_sign:
+                points_4[0].append(index)
+            else:
+                points_4[1].append(index)
+        else:
+            if y_sign:
+                points_4[2].append(index)
+            else:
+                points_4[3].append(index)
+        index=index+1
+    c_contour_list = c_contour.tolist()
+    c_contour_list_new=[]
+    remove_point_th=[]
+    for p in points_4:
+        if len(p)>1 : #象限里不是一个孤立点
+            for index in p:
+                c_contour_list_new.append(c_contour_list[index])
+    c_contour=[]
+    c_contour.append(np.array(c_contour_list_new))
+    if len(c_contour[0])>3:
+        xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
+        rec = [xs,ys,ws,hs]
+    return rec
+
+
+
+
+
+
 
 if __name__ == '__main__':
     rimg = cv2.imread('d:\\test.jpg')
@@ -34,7 +80,9 @@ if __name__ == '__main__':
     c_contour.append(np.array(center_list))
     cv2.drawContours(img, c_contour, -1, color=(127, 127, 127), thickness=3, maxLevel=5)
     xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
-    cv2.rectangle(img, (xs, ys), (xs+ + ws, ys + hs), (255, 255, 255), 1)
+    cv2.rectangle(img, (xs, ys), (xs + + ws, ys + hs), (255, 255, 255), 2)
+    [xs, ys, ws, hs] = island_remove([xs, ys, ws, hs], c_contour[0])
+    cv2.rectangle(img, (xs, ys), (xs+ + ws, ys + hs), (100, 100, 100), 5)
     cv2.imshow('1',img)
     '''
     hist = cv2.calcHist([img], [0], None, [256], [0, 255])

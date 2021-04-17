@@ -563,24 +563,32 @@ class main_ui:
                                 center_list.append([[cX, cY]])
                             c_contour.append(np.array(center_list))
                             xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
+                            #剔除孤立点
+
+                            [xs,ys,ws,hs]=funcs.island_remove([xs,ys,ws,hs],c_contour[0])
                             cv2.rectangle(img, (xs, ys), (xs+ws, ys + hs), (200, 200, 200), 2)
-                            print(xs,ys,ws,hs)
-                            x_coe=img_x/ws/10
-                            wsn=int(ws*x_coe)
+
+                            x_coe=img_x/ws/10  #矩形越小外扩越大，最大扩5倍
+                            if x_coe>5:
+                                x_coe=5
+                            wsn=int( ws * (1+x_coe-0.1)) #新窗口尺寸
                             y_coe = img_y / hs / 10
-                            hsn =int( hs * y_coe)
-                            rec_x = xs - int((wsn-ws)/2)
+                            if y_coe>5:
+                                y_coe=5
+                            hsn =int( hs * (1+y_coe-0.1))
+                            rec_x = xs - int((wsn-ws)/2) #中心平移对准
                             if rec_x < 0:
                                 rec_x = 0
-                            if rec_x + wsn * 2 > img_x:
-                                rec_x = img_x - wsn * 2
+                            if rec_x + wsn  > img_x:
+                                rec_x = img_x - wsn
                             rec_y = ys - int((hsn-hs) / 2)
                             if rec_y < 0:
                                 rec_y = 0
-                            if rec_y + hsn * 2 > img_y:
-                                rec_y = img_y - hsn * 2
-                            cv2.rectangle(img, (rec_x, rec_y), (xs + 2 * wsn, ys + 2 * hsn), (255, 255, 255), 2)
-                            cv2.rectangle(img, (rec_x, rec_y), (xs + 2*wsn, ys + 2*hsn), (255, 255, 255), 2)
+                            if rec_y + hsn  > img_y:
+                                rec_y = img_y - hsn
+                            cv2.rectangle(img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+
+
                         else:
                             for c in contours:
                                 M = cv2.moments(c)
