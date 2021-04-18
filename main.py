@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import pylab
 import funcs
 
+
 class main_ui:
     '''
     主窗口界面设计
@@ -49,7 +50,7 @@ class main_ui:
         self.video_ready = [False, False, False]
         self.video_enable = [False, False, False]
         self.que = []
-        self.que_time=[]
+        self.que_time = []
         self.cam1_que = []
         self.cam2_que = []
         self.img = [None, None, None]
@@ -58,20 +59,19 @@ class main_ui:
         self.cam_loop = False
         self.process_loop_camera = None
         self.img_video_offline = cv2.imread("offline.jpg", cv2.IMREAD_UNCHANGED)  # 不支持中文
-        self.img_video_offline_streched=None
+        self.img_video_offline_streched = None
 
         self.loading_finished = True
-        self.start_time=[0,0,0,0]
-        self.current_time=[0,0,0,0]
-        self.ai_ip=['192.168.3.102:7788','192.168.3.100:7788']
-        self.ai_status=[False,False]
-        self.cam_ip=['10.193.232.5','10.193.232.4']
-        self.cam_res=[]
-        self.ai_rec=[]
+        self.start_time = [0, 0, 0, 0]
+        self.current_time = [0, 0, 0, 0]
+        self.ai_ip = ['192.168.3.102:7788', '192.168.3.100:7788']
+        self.ai_status = [False, False]
+        self.cam_ip = ['10.193.232.5', '10.193.232.4']
+        self.cam_res = []
+        self.ai_rec = []
         for i in range(len(self.ai_ip)):
             self.ai_rec.append([])
         self.tcp_server_process = None
-
 
     def ui_menu(self):
         # 创建一个顶级菜单
@@ -136,6 +136,7 @@ class main_ui:
     def closeWindow(self):
         self.root.destroy()
         root.destroy()
+
     def get_local_ip(self):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -154,22 +155,21 @@ class main_ui:
                 s.settimeout(None)
                 self.ai_status[i] = True
                 s.shutdown(2)
-                #return True
+                # return True
             except:
-                #return False
-                print(ip,":",port," lost!......")
-                self.ai_status[i]=False
+                # return False
+                print(ip, ":", port, " lost!......")
+                self.ai_status[i] = False
 
             time.sleep(2)
 
-
-    def ai_process_start(self,i):
+    def ai_process_start(self, i):
         tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         [ip, port] = self.ai_ip[i].split(":")
         print(ip, port)
         is_connected = False
         HOST = self.get_local_ip()
-        HOST="hostip_192.168.3.153_7788"
+        HOST = "hostip_192.168.3.153_7788"
         try:
             tcp_client.connect((ip, 10086))  # 10086是所有AI模块接收控制的服务端口
             is_connected = True
@@ -196,7 +196,7 @@ class main_ui:
                     print(self.ai_ip[i], " connect succeed")
         except Exception as e:  # 连接失败
             print(e, self.ai_ip[i], " connect failed")
-            self.ai_status[i]= False
+            self.ai_status[i] = False
             if is_connected:
                 tcp_client.shutdown(2)
                 tcp_client.close()
@@ -205,21 +205,21 @@ class main_ui:
             tcp_client.close()
             self.ai_status[i] = True
             aidetect_process = threading.Thread(target=self.IsOpen,
-                                               args=(i, ip, 10086))
+                                                args=(i, ip, 10086))
             aidetect_process.daemon = True
             aidetect_process.start()
             print("aidetect process started:", aidetect_process)
             time.sleep(2)
 
     def callback_start_monitor(self):
-        self.display_enable=True
+        self.display_enable = True
         display_process = threading.Thread(target=self.display,
-                                        args=(self.camera_label, self.camera_label))
+                                           args=(self.camera_label, self.camera_label))
         display_process.daemon = True
         display_process.start()
         print("display process started:", display_process)
-        #current_url = "rtmp://58.200.131.2:1935/livetv/cctv1hd"
-        current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=1"
+        # current_url = "rtmp://58.200.131.2:1935/livetv/cctv1hd"
+        current_url = "rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=0"
         '''
         try:
             print(current_url, "checking")
@@ -232,28 +232,28 @@ class main_ui:
         except requests.exceptions.ConnectionError:
             pass
         '''
-        #current_url="rtmp://58.200.131.2:1935/livetv/dfhd"
-        self.video_enable[0]=True
-        video0_process=threading.Thread(target=self.video_loop_diff,
-                         args=(0, self.camera_label,
-                             current_url, "0"))
+        # current_url="rtmp://58.200.131.2:1935/livetv/dfhd"
+        self.video_enable[0] = True
+        video0_process = threading.Thread(target=self.video_loop_diff,
+                                          args=(0, self.camera_label,
+                                                current_url, "0"))
         video0_process.daemon = True
         video0_process.start()
         print("video_0 process started:", video0_process)
-        current_url="rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=1"
+        current_url = "rtsp://admin:admin@10.193.232.4:554/cam/realmonitor?channel=1&subtype=0"
 
-        self.video_enable[1]=True
-        video1_process=threading.Thread(target=self.video_loop,
-                         args=(1, self.camera_label,
-                             current_url, "1"))
+        self.video_enable[1] = True
+        video1_process = threading.Thread(target=self.video_loop,
+                                          args=(1, self.camera_label,
+                                                current_url, "1"))
         video1_process.daemon = True
         video1_process.start()
         print("video_1 process started:", video1_process)
-        self.ai_start=True
-        if self.tcp_server_process == None :
+        self.ai_start = True
+        if self.tcp_server_process == None:
 
-            self.tcp_server_process=threading.Thread(target=self.tcp_server,
-                             args=())
+            self.tcp_server_process = threading.Thread(target=self.tcp_server,
+                                                       args=())
             self.tcp_server_process.daemon = True
             self.tcp_server_process.start()
             print("tcp_server_process started:", self.tcp_server_process)
@@ -265,17 +265,14 @@ class main_ui:
                 self.tcp_server_process.start()
                 print("tcp_server_process restarted:", self.tcp_server_process)
 
-
-
         for i in range(len(self.ai_ip)):
-            p=threading.Thread(target=self.ai_process_start,args=(i,))
+            p = threading.Thread(target=self.ai_process_start, args=(i,))
             p.daemon = True
             p.start()
         return
 
-
     def callback_stop_monitor(self):
-        self.display_enable=False
+        self.display_enable = False
         self.ai_start = False
         self.video_enable[0] = False
         self.video_enable[1] = False
@@ -283,7 +280,7 @@ class main_ui:
         tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             tcp_client.connect(('192.168.3.100', 10086))
-            data='stop'
+            data = 'stop'
             tcp_client.sendall(data.encode())
             received = tcp_client.recv(4096)
             # print("Bytes Sent:     {}".format(data2))
@@ -293,10 +290,8 @@ class main_ui:
             print(e)
             tcp_client.close()
 
-
-
     def layout_display_bind(self, Event=None):
-        #print(self.root.winfo_width(), self.root.winfo_height())
+        # print(self.root.winfo_width(), self.root.winfo_height())
         # win=Event
         # print(Event)
         # self.Event_prev=Event
@@ -305,28 +300,28 @@ class main_ui:
         # print(Event)
         width = self.root.winfo_width()
         height = self.root.winfo_height()
-        label_height=int(width / 2 / 4 * 3)
+        label_height = int(width / 2 / 4 * 3)
         self.camera_label.place(x=1, y=1,
                                 width=width - 2, height=label_height)  # 4:3
-        self.text_label.place(x=0, y=label_height+1, width=width,height=height - label_height-1)
-        self.VScroll3.place(x= width- 16-3, y=1, width=16, height=height - label_height-16-3)
-        self.VScroll4.place(x=1, y=height - label_height-16-4, width=width-16-1, height=16)
+        self.text_label.place(x=0, y=label_height + 1, width=width, height=height - label_height - 1)
+        self.VScroll3.place(x=width - 16 - 3, y=1, width=16, height=height - label_height - 16 - 3)
+        self.VScroll4.place(x=1, y=height - label_height - 16 - 4, width=width - 16 - 1, height=16)
 
         if (self.camera_label.winfo_width() * self.camera_label.winfo_height() > 1000):
             self.img_video_offline_streched = cv2.resize(self.img_video_offline, (
-                int(self.camera_label.winfo_width()/2), int(self.camera_label.winfo_height())))
+                int(self.camera_label.winfo_width() / 2), int(self.camera_label.winfo_height())))
             cv2image = cv2.cvtColor(self.img_video_offline_streched, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
             self.img_video_offline_streched = Image.fromarray(cv2image)  # 将图像转换成Image对象
             self.current_image = Image.new('RGB', (
                 (int(self.camera_label.winfo_width())), int(self.camera_label.winfo_height())))
+
     def display(self, master, panel):
         # print("self.display_enable",self.display_enable)
-        width=panel.winfo_width()
-        height=panel.winfo_height()
+        width = panel.winfo_width()
+        height = panel.winfo_height()
 
-        y_ratio=height/144
+        y_ratio = height / 144
         x_ratio = y_ratio
-
 
         if self.display_enable:
             # time.sleep(0.01)
@@ -334,48 +329,49 @@ class main_ui:
             for i in range(2):
                 if self.lock[i].acquire():
                     if self.video_ready[i]:
-                        if i==1 :
-                            if len(self.que)>=2: #延时显示
-                                img_pop=self.que.pop(0)
-                                time_pop=self.que_time.pop(0)
+                        if i == 1:
+                            if len(self.que) >= 2:  # 延时显示
+                                img_pop = self.que.pop(0)
+                                time_pop = self.que_time.pop(0)
                                 draw = ImageDraw.Draw(img_pop)  # 图片上打印  此处可以绘制识别结果
                                 time_string = time.strftime("%Y-%m-%d %H:%M:%S",
                                                             time.localtime(int(time_pop / 1000)))
                                 font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
-                                #draw.text((int(width/2), int(height/2)), time_string, (255, 255, 0),
-                                #draw.text((int(width/4), int(height/4)), time_string, (255, 255, 0),
+                                # draw.text((int(width/2), int(height/2)), time_string, (255, 255, 0),
+                                # draw.text((int(width/4), int(height/4)), time_string, (255, 255, 0),
                                 #          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
                                 if self.ai_status[i] == True:
-                                    draw.text((int(width/4)-200, 30), 'AI: 在线', (255, 255, 0), font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                    draw.text((int(width / 4) - 200, 30), 'AI: 在线', (255, 255, 0),
+                                              font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
 
                                 else:
-                                    draw.text((int(width/4)-200, 30), 'AI: 掉线', (255, 0, 0),
+                                    draw.text((int(width / 4) - 200, 30), 'AI: 掉线', (255, 0, 0),
                                               font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
                                 if len(self.ai_rec[i]) > 0:
-                                    draw.text((int(width/4), int(height/2)), 'Warning', (255, 255, 0),
-                                          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
-                                    xy=[0,0,0,0]
-                                    recs=self.ai_rec[i].pop(0)
-                                    print(self.ai_rec[i],recs)
-                                    if(len(recs)>0):
+                                    draw.text((int(width / 4), int(height / 2)), 'Warning', (255, 255, 0),
+                                              font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                                    xy = [0, 0, 0, 0]
+                                    recs = self.ai_rec[i].pop(0)
+                                    print(self.ai_rec[i], recs)
+                                    if (len(recs) > 0):
                                         for j in range(len(recs)):
                                             for k in range(2):
-                                                xy[k*2]=int(recs[j][k*2]*x_ratio)
-                                                xy[k * 2+1] = int(recs[j][k*2+1] * y_ratio)
+                                                xy[k * 2] = int(recs[j][k * 2] * x_ratio)
+                                                xy[k * 2 + 1] = int(recs[j][k * 2 + 1] * y_ratio)
                                             print(xy)
-                                            xys=tuple(xy)
-                                            #if(len(xys)==4):
+                                            xys = tuple(xy)
+                                            # if(len(xys)==4):
                                             draw.rectangle(xy=xys, fill=None, outline=(255, 0, 0), width=6)
-                                #self.ai_rec[i]=[]
+                                # self.ai_rec[i]=[]
                                 img.append(img_pop)
 
                                 self.img_bak[i] = img_pop
-                            #else:
+                            # else:
                             #    img.append(self.img_video_offline_streched)
                             #    self.img_bak[i] = self.img[i]
                         else:
                             img.append(self.img[i].copy())
-                            self.img_bak[i]=self.img[i]
+                            self.img_bak[i] = self.img[i]
                     else:
                         if self.img_bak[i] == None:
                             img.append(self.img_video_offline_streched)
@@ -385,26 +381,26 @@ class main_ui:
                             draw.text((10, 10), "连接中。。。。\n", fill=(255, 0, 0), font=typeface)
                             img.append(self.img_bak[i])
                     self.lock[i].release()
-                #else:
+                # else:
                 #    img.append(self.img_video_offline_streched)
-            #print("len of Img:",len(img),img)
+            # print("len of Img:",len(img),img)
             # img = (img1, img2, img3)
             # print(img1.shape,img2.shape,img3.shape)
             # imgs = np.concatenate(img, axis=0)
             # cv2.imshow("test",imgs)
             # cv2image = cv2.cvtColor(imgs, cv2.COLOR_BGR2RGBA)  # 转换颜色从BGR到RGBA
             # current_image = Image.fromarray(cv2image).copy()  # 将图像转换成Image对象
-            if len(img)==2:
+            if len(img) == 2:
                 box = (0, 0, img[0].width, img[0].height)
                 # print(box,img1.width,img1.height)
                 self.current_image.paste(img[0], box)
-                box = (img[0].width, 0, img[0].width+img[1].width, img[1].height)
-                #box = (0, img[0].height, img[1].width , img[0].height+img[1].height)
+                box = (img[0].width, 0, img[0].width + img[1].width, img[1].height)
+                # box = (0, img[0].height, img[1].width , img[0].height+img[1].height)
                 # print(box, img2.width, img2.height)
                 self.current_image.paste(img[1], box)
-                #box = (0, img[0].height + img[1].height, img[2].width, img[0].height + img[1].height + img[2].height)
+                # box = (0, img[0].height + img[1].height, img[2].width, img[0].height + img[1].height + img[2].height)
                 # print(box, img3.width, img3.height)
-                #self.current_image.paste(img[2], box)
+                # self.current_image.paste(img[2], box)
                 self.imgtk1 = ImageTk.PhotoImage(image=self.current_image, master=master)
 
                 panel.imgtk = self.imgtk1
@@ -415,68 +411,70 @@ class main_ui:
                 self.counter = self.counter + 1
                 if self.counter >= 50:
                     self.counter = 0
-                    print("video displaying.....................................：","len(img):",len(img))
+                    print("video displaying.....................................：", "len(img):", len(img))
             master.after(50, self.display, master, panel)
             # self.display(master, panel)
         # print("quit display")
 
     def video_loop_diff(self, video_th, panel, url, cam_id):
         print("process for video", video_th, "  ", url)
-        #cap = cv2.VideoCapture(url)
+        # cap = cv2.VideoCapture(url)
         cap = cv2.VideoCapture(0)
-        now_time = int(round(time.time()*1000))
-        self.start_time[video_th]=int(now_time)
+        now_time = int(round(time.time() * 1000))
+        self.start_time[video_th] = int(now_time)
         print("process for video", video_th, "  ", cap, self.start_time[video_th])
         counter = 0
         previous_time = time.time()
         fps = 30
-        for i in range(1,10):
+        for i in range(1, 3):
             success, img = cap.read()
             success, img = cap.read()
-            #if video_th ==1:
+            # if video_th ==1:
             #    self.que.append(img)
             time.sleep(0.02)
         milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
         raw_time = int(milliseconds)
         now_time = int(round(time.time() * 1000))
         self.current_time[video_th] = self.start_time[video_th] + raw_time
-        dtime=self.current_time[video_th]-now_time
-        self.start_time[video_th]=self.start_time[video_th]-3*dtime   #每台相机延时不同，需要修正
+        dtime = self.current_time[video_th] - now_time
+        self.start_time[video_th] = self.start_time[video_th] - 3 * dtime  # 每台相机延时不同，需要修正
 
         font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
-        net_false_counter=0
+        net_false_counter = 0
         width = int(panel.winfo_width() / 2)
         height = int(width * 3 / 4)
         success, img_prev = cap.read()
-        #img_prev = cv2.resize(img_prev, (width, height))
-        img_y=img_prev.shape[0]
-        img_x=img_prev.shape[1]
-        img_sum=img_y*img_x
-        warning_threshold=img_sum/10 #画面剧烈变化阈值，通常为大物体移动（人员、大火）引起
-        img_prev[0:int(img_y/10),int(img_x*2/3):img_x]=0
-        #cv2.imshow("time",img_prev)
-        #cv2.waitKey(1)
-        #print(img_x,img_y)
-        target_x=177
-        target_y=133
+        img_y = img_prev.shape[0]
+        img_x = img_prev.shape[1]
+        img_sum = img_y * img_x
+        cluster_thrd=img_x/3
+        if cluster_thrd>100:
+            cluster_thrd=100
+        warning_threshold = img_sum / 10  # 画面剧烈变化阈值，通常为大物体移动（人员、大火）引起
+        img_prev[0:int(img_y / 10), int(img_x * 2 / 3):img_x] = 0
+        # cv2.imshow("time",img_prev)
+        # cv2.waitKey(1)
+        # print(img_x,img_y)
+        target_x = 177
+        target_y = 133
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        kernel3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        kernel15 = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
 
-        object_catched_counter=0
-        object_lost_counter=0
+        object_catched_counter = 0
+        object_lost_counter = 0
         object_catched_prev = False
         target_win = []
-        fog_possible=False #低浓度雾
-        bin_threshold_prev=20
+        fog_possible = False  # 低浓度雾
+        bin_threshold_prev = 20
         while self.video_enable[video_th]:
-
 
             success, img_now = cap.read()  # 从摄像头读取照片
             cv2.waitKey(1)
             success, img_now = cap.read()  # 从摄像头读取照片
             if success and img_now.size > 10000:
 
-                net_false_counter=0
+                net_false_counter = 0
 
                 cv2img = cv2.cvtColor(img_now, cv2.COLOR_BGR2RGB)  # cv2和PIL中颜色的hex码的储存顺序不同
                 img_now[0:int(img_y / 10), int(img_x * 2 / 3):img_x] = 0
@@ -484,126 +482,159 @@ class main_ui:
 
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
-                #hist = cv2.calcHist(img, [0], None, [246], [10, 255])
-                #hist_v = hist.tolist()
+                # hist = cv2.calcHist(img, [0], None, [246], [10, 255])
+                # hist_v = hist.tolist()
 
-                #maxhist = np.argmax(hist_v)+10
-                max_level=max(max(img.tolist()))
+                # maxhist = np.argmax(hist_v)+10
+                max_level = max(max(img.tolist()))
                 bin_threshold = int(max_level * 0.5)
-                if bin_threshold>bin_threshold_prev+10:
-                    bin_threshold=bin_threshold_prev+10
-                elif bin_threshold<bin_threshold_prev-10:
+                if bin_threshold > bin_threshold_prev + 10:
+                    bin_threshold = bin_threshold_prev + 10
+                elif bin_threshold < bin_threshold_prev - 10:
                     bin_threshold = bin_threshold_prev - 10
                 else:
                     bin_threshold = bin_threshold_prev
                 if bin_threshold < 20:
-                    bin_threshold=20
-                    fog_possible=True
+                    bin_threshold = 20
+                    fog_possible = True
                 else:
-                    fog_possible=False
-                bin_threshold_prev=bin_threshold
-                #print(bin_threshold,max_level,fog_possible)
-                cv2.threshold(img, bin_threshold, 255, cv2.THRESH_BINARY,dst=img)
+                    fog_possible = False
+                bin_threshold_prev = bin_threshold
+                # print(bin_threshold,max_level,fog_possible)
+                cv2.threshold(img, bin_threshold, 255, cv2.THRESH_BINARY, dst=img)
 
                 img = cv2.medianBlur(img, 5)
-                NonZero=cv2.countNonZero(img)
-                img = cv2.dilate(img, kernel)
+                NonZero = cv2.countNonZero(img)
+                img = cv2.dilate(img, kernel15)
                 img_dis = img.copy()
-                cv2.putText(cv2img,"Max:"+str(max_level)+"Thrd:"+str(bin_threshold),(50,50),cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
-                contours, hierarchy = cv2.findContours(img,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-                cv2.drawContours(img, contours, -1, color=(127, 127, 127), thickness=3, maxLevel=5)
-                #以下部分为处理ROI的算法
-                lens=len(contours)
-                #print(lens,NonZero)
-                center_list=[]
-                rect_list=[]
-                if NonZero>warning_threshold:   #运动剧烈或照明条件突变，不用AI识别，直接报警现场异常
+                cv2.putText(cv2img, "Max:" + str(max_level) + "Thrd:" + str(bin_threshold) + "NonZero" + str(NonZero),
+                            (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(img_dis, contours, -1, color=(127, 127, 127), thickness=3, maxLevel=5)
+                # 以下部分为处理ROI的算法
+                lens = len(contours)
+                # print(lens,NonZero)
+                center_list = []
+                rect_list = []
+                if NonZero > warning_threshold:  # 运动剧烈或照明条件突变，不用AI识别，直接报警现场异常
                     object_lost_counter = 10
                     object_catched_counter = 0
 
                 else:
-                    if  lens>0 and lens<50 and NonZero>50:  #有效目标出现
-                        object_catched_counter=object_catched_counter+1
-                        object_lost_counter = 0
-                        if object_catched_counter>5:        #有效目标出现超过5帧
-                            object_catched_prev = True
-                            object_catched_counter =6
-                    else:
-                        object_lost_counter=object_lost_counter+1
-                        object_catched_counter = 0
-                        if object_lost_counter>5:           #目标丢失超过5帧
-                            object_catched_prev=False
-                            target_win = []
-                            object_lost_counter=6
+                    if lens > 0 and lens < 50 and NonZero > 10:  # 有效目标出现
+                        object_catched_counter = object_catched_counter + 1
 
+                        if object_catched_counter > 5:  # 有效目标出现超过5帧
+                            object_catched_prev = True
+                            object_catched_counter = 6
+                            object_lost_counter = 0
+                    else:
+                        object_lost_counter = object_lost_counter + 1
+                        object_catched_counter = 0
+                        if object_lost_counter > 5:  # 目标丢失超过5帧
+                            object_catched_prev = False
+                            object_lost_counter = 6
+                            object_catched_counter = 0
                     if object_catched_prev == True:
-                        max_w=-1000
-                        max_h=-1000
-                        max_win_th=-1
-                        c_contour=[]
-                        if lens >= 3:  #如果是多个分散的轮廓，用各轮廓的中心重洗组合，合并一个完整的矩形框
+                        pts=[]
+                        for c in contours: #将所有轮廓点合并成一个序列
+                            xs, ys, ws, hs = cv2.boundingRect(c)
+                            cv2.rectangle(cv2img, (xs, ys), (xs + ws, ys + hs), (100, 100, 0), 2)
+                            rec_contour=[[xs,ys],[xs+ws,ys],[xs+ws,ys+hs],[xs,ys+hs]]
+                            pts = pts + funcs.contour_pts(rec_contour,thrd=50) #将轮廓转成点序列，若轮廓线段长度大于阈值thrd，则补充插值点，防止后续聚类被分离
+                        clst_result = funcs.cluster(pts,thrd=cluster_thrd) #轮廓点聚类
+
+                        for i in range(len(clst_result)):
+                            clustered_pts=[]
+                            strs=''
+                            for pts_index in clst_result[i]:
+                                clustered_pts.append([pts[pts_index]])
+                                strs=strs+str(pts_index)+" "
+                            cv2.putText(img_dis,
+                                    strs,
+                                    (50, (i+1)*50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                            xs, ys, ws, hs = cv2.boundingRect(np.array(clustered_pts)) #聚类点找矩形外框
+
+
+                            [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
+                            cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                            cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+
+                    '''
+                    if object_catched_prev == True:
+                        max_w = -1000
+                        max_h = -1000
+                        max_win_th = -1
+                        c_contour = []
+                        if lens >= 3:  # 如果是多个分散的轮廓，用各轮廓的中心重洗组合，合并一个完整的矩形框
                             for c in contours:
                                 # compute the center of the contour
                                 M = cv2.moments(c)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])
-                                #print(cX,cY)
+                                # print(cX,cY)
                                 center_list.append([[cX, cY]])
                             c_contour.append(np.array(center_list))
                             xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
-                            #剔除孤立点
+                            # 剔除孤立点
 
-                            [xs,ys,ws,hs]=funcs.island_remove([xs,ys,ws,hs],c_contour[0])
-                            cv2.rectangle(img, (xs, ys), (xs+ws, ys + hs), (200, 200, 200), 2)
-                            [rec_x,rec_y,wsn,hsn]=funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
+                            [xs, ys, ws, hs] = funcs.island_remove([xs, ys, ws, hs], c_contour[0])
+                            # cv2.rectangle(img, (xs, ys), (xs+ws, ys + hs), (200, 200, 200), 2)
+                            [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
                             cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
                             cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
 
 
-                        elif lens==2:
+                        elif lens <= 3:
                             # 如果是2个轮廓，分别计算单个轮廓的尺寸
                             # 如果单个尺寸大于177*133的话直接输出；
                             # 否则与另一个合并，如果非孤立轮廓，合并后的尺寸大于
+                            max_rec = -100
+
                             for c in contours:
                                 M = cv2.moments(c)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])
+                                center_list.append([[cX, cY]])
                                 xs, ys, ws, hs = cv2.boundingRect(c)
                                 [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
+                                if wsn > max_rec:
+                                    max_rec = wsn
+                                if hsn > max_rec:
+                                    max_rec = hsn
+
                                 cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                                cv2.rectangle(cv2img,(rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                        elif lens==1:
-                            #如果是一个轮廓，直接放大后输出
+                                cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                        elif lens == 1:
+                            # 如果是一个轮廓，直接放大后输出
                             xs, ys, ws, hs = cv2.boundingRect(contours[0])
                             [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
                             cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
                             cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
                         else:
                             continue
-
-
-
-                #cv2.drawContours(cv2img, contours, -1, color=(0, 0, 255), thickness=3, maxLevel=2)
+                    '''
+                # cv2.drawContours(cv2img, contours, -1, color=(0, 0, 255), thickness=3, maxLevel=2)
 
                 cv2img = cv2.resize(cv2img, (width, height))
                 img_ = Image.fromarray(cv2img)  # 转成PIL
 
                 draw = ImageDraw.Draw(img_)  # 图片上打印
-                #time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
+                # time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
 
-                #draw.text((width - 300, 80), time_string, (0, 255, 0),
+                # draw.text((width - 300, 80), time_string, (0, 255, 0),
                 #          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
 
                 draw.text((width - 80, height - 20), 'FPS: ' + str(fps), (0, 255, 0),
                           font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
-                draw.text(( 50, height - 20), '位置: CAM' + str(cam_id)+'  '+url, (255, 255, 0), font=font)
+                draw.text((50, height - 20), '位置: CAM' + str(cam_id) + '  ' + url, (255, 255, 0), font=font)
                 # img = cv2.cvtColor(np.array(pilimg), cv2.COLOR_RGB2BGR)
                 # cv2.putText(img, org=(width-80, height-20), text='FPS: ' + str(fps), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, thickness=2,
                 #            color= (0, 255, 0))
                 # cv2.putText(img, org=(int(width/2)-50, height-20), text=str(cam_id), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, thickness=2,
                 #            color= (255, 255, 0))
 
-                if True:#self.lock[video_th].acquire():
+                if True:  # self.lock[video_th].acquire():
                     self.img[video_th] = img_
                     if video_th == 1:
                         if len(self.que) > 3:
@@ -611,11 +642,11 @@ class main_ui:
                         self.que.append(img_)
                         self.que_time.append(self.current_time[video_th])
                     self.video_ready[video_th] = True
-                    #self.lock[video_th].release()
+                    # self.lock[video_th].release()
             else:
                 if net_false_counter > 30:
                     self.video_ready[video_th] = False
-                net_false_counter=net_false_counter+1
+                net_false_counter = net_false_counter + 1
             counter = counter + 1
             cv2.imshow("Image", img_dis)
             if counter == 30:
@@ -625,48 +656,48 @@ class main_ui:
                 fps = int(counter / (current_time - previous_time))
                 previous_time = current_time
                 counter = 0
-                print("video", video_th, "capturing......", fps, "net_false_counter:",net_false_counter)
-                net_state=True
+                print("video", video_th, "capturing......", fps, "net_false_counter:", net_false_counter)
+                net_state = True
                 if fps == 0:
                     cap.release()
                     time.sleep(2)
                     cap = cv2.VideoCapture(url)
                 success, img = cap.read()
-            #img_prev = img_now
+            # img_prev = img_now
 
-            cv2.waitKey(1)
+            # cv2.waitKey(1)
         cap.release()
 
     def video_loop(self, video_th, panel, url, cam_id):
         print("process for video", video_th, "  ", url)
         cap = cv2.VideoCapture(url)
-        now_time = int(round(time.time()*1000))
-        self.start_time[video_th]=int(now_time)
+        now_time = int(round(time.time() * 1000))
+        self.start_time[video_th] = int(now_time)
         print("process for video", video_th, "  ", cap, self.start_time[video_th])
         counter = 0
         previous_time = time.time()
         fps = 30
-        for i in range(1,10):
+        for i in range(1, 10):
             success, img = cap.read()
             success, img = cap.read()
-            #if video_th ==1:
+            # if video_th ==1:
             #    self.que.append(img)
             time.sleep(0.02)
         milliseconds = cap.get(cv2.CAP_PROP_POS_MSEC)
         raw_time = int(milliseconds)
         now_time = int(round(time.time() * 1000))
         self.current_time[video_th] = self.start_time[video_th] + raw_time
-        dtime=self.current_time[video_th]-now_time
-        self.start_time[video_th]=self.start_time[video_th]-3*dtime   #每台相机延时不同，需要修正
+        dtime = self.current_time[video_th] - now_time
+        self.start_time[video_th] = self.start_time[video_th] - 3 * dtime  # 每台相机延时不同，需要修正
 
         font = ImageFont.truetype("simhei.ttf", 20, encoding="utf-8")  # 参数1：字体文件路径，参数2：字体大小
-        net_false_counter=0
+        net_false_counter = 0
         width = int(panel.winfo_width() / 2)
         height = int(width * 3 / 4)
         while self.video_enable[video_th]:
 
-            #success, img = cap.read()
-            #cv2.waitKey(5)
+            # success, img = cap.read()
+            # cv2.waitKey(5)
             success, img = cap.read()  # 从摄像头读取照片
             if success and img.size > 10000:
                 '''
@@ -688,9 +719,9 @@ class main_ui:
                     hours = minutes // 60
                     minutes = minutes % 60
                 '''
-                #print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
+                # print("video", video_th,raw_time, int(hours), int(minutes), int(seconds), int(milliseconds),now_time,self.current_time[video_th],self.current_time[video_th]-now_time)
                 # self.lock1.acquire()
-                net_false_counter=0
+                net_false_counter = 0
 
                 img = cv2.resize(img, (width, height))
                 cv2img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # cv2和PIL中颜色的hex码的储存顺序不同
@@ -698,21 +729,21 @@ class main_ui:
                 img_ = Image.fromarray(cv2img)  # 转成PIL
 
                 draw = ImageDraw.Draw(img_)  # 图片上打印
-                #time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
+                # time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
 
-                #draw.text((width - 300, 80), time_string, (0, 255, 0),
+                # draw.text((width - 300, 80), time_string, (0, 255, 0),
                 #          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
 
                 draw.text((width - 80, height - 20), 'FPS: ' + str(fps), (0, 255, 0),
                           font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
-                draw.text(( 50, height - 20), '位置: CAM' + str(cam_id)+'  '+url, (255, 255, 0), font=font)
+                draw.text((50, height - 20), '位置: CAM' + str(cam_id) + '  ' + url, (255, 255, 0), font=font)
                 # img = cv2.cvtColor(np.array(pilimg), cv2.COLOR_RGB2BGR)
                 # cv2.putText(img, org=(width-80, height-20), text='FPS: ' + str(fps), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, thickness=2,
                 #            color= (0, 255, 0))
                 # cv2.putText(img, org=(int(width/2)-50, height-20), text=str(cam_id), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, thickness=2,
                 #            color= (255, 255, 0))
 
-                if True:#self.lock[video_th].acquire():
+                if True:  # self.lock[video_th].acquire():
                     self.img[video_th] = img_
                     if video_th == 1:
                         if len(self.que) > 3:
@@ -720,33 +751,33 @@ class main_ui:
                         self.que.append(img_)
                         self.que_time.append(self.current_time[video_th])
                     self.video_ready[video_th] = True
-                    #self.lock[video_th].release()
+                    # self.lock[video_th].release()
             else:
                 if net_false_counter > 30:
                     self.video_ready[video_th] = False
-                net_false_counter=net_false_counter+1
+                net_false_counter = net_false_counter + 1
             counter = counter + 1
             if counter == 30:
                 current_time = time.time()
                 fps = int(counter / (current_time - previous_time))
                 previous_time = current_time
                 counter = 0
-                print("video", video_th, "capturing......", fps, "net_false_counter:",net_false_counter)
-                net_state=True
+                print("video", video_th, "capturing......", fps, "net_false_counter:", net_false_counter)
+                net_state = True
                 if fps == 0:
                     cap.release()
                     time.sleep(2)
                     cap = cv2.VideoCapture(url)
                 success, img = cap.read()
 
-            #time.sleep(0.01)
+            # time.sleep(0.01)
         cap.release()
 
     def tcp_server(self):
         # 创建socket
         tcp_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # 本地信息
-        local_ip=self.get_local_ip()
+        local_ip = self.get_local_ip()
         address = (local_ip, 7788)
         print(address)
         # 绑定
@@ -780,14 +811,14 @@ class main_ui:
 
         time.sleep(1)
 
-    def get_warning_info(self,client_socket, clientAddr):
+    def get_warning_info(self, client_socket, clientAddr):
         is_matched = False
-        for id in range(len(self.ai_ip)):  #寻找当前通讯ip在ai_ip中的位置
+        for id in range(len(self.ai_ip)):  # 寻找当前通讯ip在ai_ip中的位置
             [ip, port] = self.ai_ip[id].split(":")
             if clientAddr[0] == ip:
-                is_matched=True
-                index=id
-        print(is_matched,index)
+                is_matched = True
+                index = id
+        print(is_matched, index)
         if is_matched:
             self.ai_rec[index] = []
             try:
@@ -795,29 +826,25 @@ class main_ui:
                     recv_data = client_socket.recv(1024)  # 接收1024个字节
                     print(recv_data)
 
-
                     if self.lock[index].acquire():
-                        if(len(self.ai_rec[index])>5):  #防止延时
+                        if (len(self.ai_rec[index]) > 5):  # 防止延时
                             self.ai_rec[index].pop(0)
                         x = recv_data.decode('gbk').split("_")
-                        if len(x)>0 and len(x) %4 ==0:
+                        if len(x) > 0 and len(x) % 4 == 0:
                             self.warning = True
-                            recs=[]
-                            for i in range(int(len(x) / 4)): #增加矩形框
-                                rec=[0,0,0,0]
+                            recs = []
+                            for i in range(int(len(x) / 4)):  # 增加矩形框
+                                rec = [0, 0, 0, 0]
                                 for j in range(4):
-                                    rec[j]=float(x[i * 4 + j])
+                                    rec[j] = float(x[i * 4 + j])
                                 recs.append(rec)
                             self.ai_rec[index].append(recs)
                         self.lock[index].release()
                     print(self.ai_rec[index])
-                    if recv_data==b'':
+                    if recv_data == b'':
                         break
             except Exception as e:
                 print(e)
-
-
-
 
 
 if __name__ == '__main__':
