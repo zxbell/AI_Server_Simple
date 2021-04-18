@@ -130,8 +130,9 @@ def list_clean(list0):
 # cluster_thrd_coe：相对阈值系数*最大点间距为聚类阈值
 # thrd: 最小聚类阈值
 def cluster(pts, cluster_thrd_coe=0.5, thrd=50):
-    cluster_list=[[],[],[],[],[],[],[],[]] #最多分四类
+    cluster_list=[] #最多分四类
     max_dist, dists = dist_list(pts) #计算所有点间距
+
     cluster_thrd = cluster_thrd_coe * max_dist
     #if cluster_thrd > thrd:
     #    cluster_thrd = thrd
@@ -140,25 +141,40 @@ def cluster(pts, cluster_thrd_coe=0.5, thrd=50):
     cluster_thrd=100
     lenth = len(pts)
     list_indexed=0
-    clustered_pts_index=[]
+    #clustered_pts_index=[]
     for pt_index in range(lenth):
         list_index_now = 0
         lens = len(cluster_list[list_indexed]) #当前类的长度
-        if lens > 0:
-            list_indexed = list_indexed + 1 #默认当前点不在之前的分类中，新建一个类
+        list_indexed=-1
         for cluster_t in cluster_list:  # 在已聚好的类中检索是否已记录过
             if pt_index in cluster_t:
                 list_indexed = list_index_now #若已分过类，则向已分过的类中添加满足条件的点
                 break
             list_index_now = list_index_now + 1
-        if list_indexed > 4:
-            break
+        if list_indexed < 0:
+            list_indexed = len(cluster_list) + 1 #当前点不在之前的分类中，新建一个类
+            cluster_list.append([])
+
         for i in range(pt_index, lenth):
-            if not i in clustered_pts_index:  # 如果该点未被聚过类
+            #if not i in clustered_pts_index:  # 如果该点未被聚过类
                 dst = dists[pt_index * lenth + i]
                 if dst < cluster_thrd: #如果是可聚类的
                     cluster_list[list_indexed].append(i)  # 在聚类表中添加当前点
-                    clustered_pts_index.append(i)  #在已聚过类的表中添加当前点
+                    #clustered_pts_index.append(i)  #在已聚过类的表中添加当前点
+    #重叠合并
+    cindex=0
+    lenth=len(cluster_list)
+    cluster_list_n=[]
+    combine_state=lenth*[0] #每个类是否已合并
+    cluster_list_n.append(cluster_list[0])
+    for cindex in range(lenth-1):
+        if combine_state[cindex] == 0:
+            cluster_list_n.append(cluster_list[cindex])
+        else:
+            break
+            #for p in cluster_list[cindex+1]:
+
+
     result=[]
     for clst in cluster_list:  #清理类中的重复点
         if len(clst)>0:
@@ -172,43 +188,44 @@ if __name__ == '__main__':
     pts = [[1, 0], [2, 0], [5, 0], [400, 0], [30, 0], [180, 0], [195, 0]]
     new_pts=contour_pts(pts, thrd=50)
     cls_result=cluster(new_pts, thrd=150)
-    rimg = cv2.imread('d:\\test.jpg')
-    img = cv2.cvtColor(rimg, cv2.COLOR_RGB2GRAY)
-    print(img.shape)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    img[1:30, 40:100] = 254
-    cv2.threshold(img, 200, 255, cv2.THRESH_BINARY, dst=img)
-    img = cv2.medianBlur(img, 5)
-    NonZero = cv2.countNonZero(img)
-    img = cv2.dilate(img, kernel)
-    contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(img, contours, -1, color=(80, 80, 80), thickness=3, maxLevel=5)
-    center_list = []
-    for c in contours:
-        # compute the center of the contour
-        M = cv2.moments(c)
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-        # print(cX,cY)
-        center_list.append([[cX, cY]])
+    success, rimg = cv2.imread('d:\\test.jpg')
+    if not success:
+        img = cv2.cvtColor(rimg, cv2.COLOR_RGB2GRAY)
+        print(img.shape)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        img[1:30, 40:100] = 254
+        cv2.threshold(img, 200, 255, cv2.THRESH_BINARY, dst=img)
+        img = cv2.medianBlur(img, 5)
+        NonZero = cv2.countNonZero(img)
+        img = cv2.dilate(img, kernel)
+        contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(img, contours, -1, color=(80, 80, 80), thickness=3, maxLevel=5)
+        center_list = []
+        for c in contours:
+            # compute the center of the contour
+            M = cv2.moments(c)
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            # print(cX,cY)
+            center_list.append([[cX, cY]])
 
-    c_contour = []
-    c_contour.append(np.array(center_list))
-    cv2.drawContours(img, c_contour, -1, color=(127, 127, 127), thickness=3, maxLevel=5)
-    xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
-    cv2.rectangle(img, (xs, ys), (xs + + ws, ys + hs), (255, 255, 255), 2)
-    [xs, ys, ws, hs] = island_remove([xs, ys, ws, hs], c_contour[0])
-    cv2.rectangle(img, (xs, ys), (xs + + ws, ys + hs), (100, 100, 100), 5)
-    cv2.imshow('1', img)
-    '''
-    hist = cv2.calcHist([img], [0], None, [256], [0, 255])
-    hist_v=hist.tolist()
-    maxhist = np.argmax(hist_v)
-    # hist是一个shape为(256,1)的数组，表示0-255每个像素值对应的像素个数，下标即为相应的像素值
-    # plot一般需要输入x,y,若只输入一个参数，那么默认x为range(n)，n为y的长度
-    print(hist,max(max(hist)),maxhist)
-    
-    plt.plot(hist)
-    plt.show()
-    '''
-    cv2.waitKey()
+        c_contour = []
+        c_contour.append(np.array(center_list))
+        cv2.drawContours(img, c_contour, -1, color=(127, 127, 127), thickness=3, maxLevel=5)
+        xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
+        cv2.rectangle(img, (xs, ys), (xs + + ws, ys + hs), (255, 255, 255), 2)
+        [xs, ys, ws, hs] = island_remove([xs, ys, ws, hs], c_contour[0])
+        cv2.rectangle(img, (xs, ys), (xs + + ws, ys + hs), (100, 100, 100), 5)
+        cv2.imshow('1', img)
+        '''
+        hist = cv2.calcHist([img], [0], None, [256], [0, 255])
+        hist_v=hist.tolist()
+        maxhist = np.argmax(hist_v)
+        # hist是一个shape为(256,1)的数组，表示0-255每个像素值对应的像素个数，下标即为相应的像素值
+        # plot一般需要输入x,y,若只输入一个参数，那么默认x为range(n)，n为y的长度
+        print(hist,max(max(hist)),maxhist)
+        
+        plt.plot(hist)
+        plt.show()
+        '''
+        cv2.waitKey()

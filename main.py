@@ -451,7 +451,7 @@ class main_ui:
         if cluster_thrd>100:
             cluster_thrd=100
         warning_threshold = img_sum / 10  # 画面剧烈变化阈值，通常为大物体移动（人员、大火）引起
-        img_prev[0:int(img_y / 10), int(img_x * 2 / 3):img_x] = 0
+        img_prev[0:int(img_y / 10), int(img_x * 2 / 3):img_x] = 0 #去掉右上角时间条，消除时间变化引起的帧差
         # cv2.imshow("time",img_prev)
         # cv2.waitKey(1)
         # print(img_x,img_y)
@@ -460,6 +460,7 @@ class main_ui:
 
         kernel3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         kernel15 = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+
 
         object_catched_counter = 0
         object_lost_counter = 0
@@ -505,7 +506,7 @@ class main_ui:
 
                 img = cv2.medianBlur(img, 5)
                 NonZero = cv2.countNonZero(img)
-                img = cv2.dilate(img, kernel15)
+                img = cv2.dilate(img, kernel3)
                 img_dis = img.copy()
                 cv2.putText(cv2img, "Max:" + str(max_level) + "Thrd:" + str(bin_threshold) + "NonZero" + str(NonZero),
                             (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
@@ -535,83 +536,19 @@ class main_ui:
                             object_catched_prev = False
                             object_lost_counter = 6
                             object_catched_counter = 0
+                    img_contour=np.zeros((img_y,img_x) ,dtype=np.uint8)
                     if object_catched_prev == True:
-                        pts=[]
-                        for c in contours: #将所有轮廓点合并成一个序列
+                        for c in contours: #将所有轮廓放大后生成新图，重新寻找contour，合并较近的轮廓
                             xs, ys, ws, hs = cv2.boundingRect(c)
-                            cv2.rectangle(cv2img, (xs, ys), (xs + ws, ys + hs), (100, 100, 0), 2)
-                            rec_contour=[[xs,ys],[xs+ws,ys],[xs+ws,ys+hs],[xs,ys+hs]]
-                            pts = pts + funcs.contour_pts(rec_contour,thrd=50) #将轮廓转成点序列，若轮廓线段长度大于阈值thrd，则补充插值点，防止后续聚类被分离
-                        clst_result = funcs.cluster(pts,thrd=cluster_thrd) #轮廓点聚类
-
-                        for i in range(len(clst_result)):
-                            clustered_pts=[]
-                            strs=''
-                            for pts_index in clst_result[i]:
-                                clustered_pts.append([pts[pts_index]])
-                                strs=strs+str(pts_index)+" "
-                            #cv2.putText(img_dis,  strs, (50, (i+1)*50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                            xs, ys, ws, hs = cv2.boundingRect(np.array(clustered_pts)) #聚类点找矩形外框
-
-
                             [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
-                            cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                            cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
+                            cv2.rectangle(img_contour, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), 255, 2)
 
-                    '''
-                    if object_catched_prev == True:
-                        max_w = -1000
-                        max_h = -1000
-                        max_win_th = -1
-                        c_contour = []
-                        if lens >= 3:  # 如果是多个分散的轮廓，用各轮廓的中心重洗组合，合并一个完整的矩形框
-                            for c in contours:
-                                # compute the center of the contour
-                                M = cv2.moments(c)
-                                cX = int(M["m10"] / M["m00"])
-                                cY = int(M["m01"] / M["m00"])
-                                # print(cX,cY)
-                                center_list.append([[cX, cY]])
-                            c_contour.append(np.array(center_list))
-                            xs, ys, ws, hs = cv2.boundingRect(c_contour[0])
-                            # 剔除孤立点
+                        contours_n, hierarchy = cv2.findContours(img_contour, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        for c in contours_n:
+                            xs, ys, ws, hs = cv2.boundingRect(c)
+                            cv2.rectangle(cv2img, (xs, ys), (xs + ws, ys + hs), (255,255,0), 2)
 
-                            [xs, ys, ws, hs] = funcs.island_remove([xs, ys, ws, hs], c_contour[0])
-                            # cv2.rectangle(img, (xs, ys), (xs+ws, ys + hs), (200, 200, 200), 2)
-                            [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
-                            cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                            cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-
-
-                        elif lens <= 3:
-                            # 如果是2个轮廓，分别计算单个轮廓的尺寸
-                            # 如果单个尺寸大于177*133的话直接输出；
-                            # 否则与另一个合并，如果非孤立轮廓，合并后的尺寸大于
-                            max_rec = -100
-
-                            for c in contours:
-                                M = cv2.moments(c)
-                                cX = int(M["m10"] / M["m00"])
-                                cY = int(M["m01"] / M["m00"])
-                                center_list.append([[cX, cY]])
-                                xs, ys, ws, hs = cv2.boundingRect(c)
-                                [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
-                                if wsn > max_rec:
-                                    max_rec = wsn
-                                if hsn > max_rec:
-                                    max_rec = hsn
-
-                                cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                                cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                        elif lens == 1:
-                            # 如果是一个轮廓，直接放大后输出
-                            xs, ys, ws, hs = cv2.boundingRect(contours[0])
-                            [rec_x, rec_y, wsn, hsn] = funcs.rec_extend_auto(xs, ys, ws, hs, img_x, img_y)
-                            cv2.rectangle(img_dis, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                            cv2.rectangle(cv2img, (rec_x, rec_y), (rec_x + wsn, rec_y + hsn), (255, 255, 255), 2)
-                        else:
-                            continue
-                    '''
+                    img_dis=img_contour
                 # cv2.drawContours(cv2img, contours, -1, color=(0, 0, 255), thickness=3, maxLevel=2)
 
                 cv2img = cv2.resize(cv2img, (width, height))
