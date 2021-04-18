@@ -133,12 +133,14 @@ def cluster(pts, cluster_thrd_coe=0.5, thrd=50):
     cluster_list=[[],[],[],[],[],[],[],[]] #最多分四类
     max_dist, dists = dist_list(pts) #计算所有点间距
     cluster_thrd = cluster_thrd_coe * max_dist
-    if cluster_thrd > thrd:
-        cluster_thrd = thrd
+    #if cluster_thrd > thrd:
+    #    cluster_thrd = thrd
     if cluster_thrd < 50:
         cluster_thrd = 50
+    cluster_thrd=100
     lenth = len(pts)
     list_indexed=0
+    clustered_pts_index=[]
     for pt_index in range(lenth):
         list_index_now = 0
         lens = len(cluster_list[list_indexed]) #当前类的长度
@@ -152,9 +154,11 @@ def cluster(pts, cluster_thrd_coe=0.5, thrd=50):
         if list_indexed > 4:
             break
         for i in range(pt_index, lenth):
-            dst = dists[pt_index * lenth + i]
-            if dst < cluster_thrd: #如果是可聚类的
-                cluster_list[list_indexed].append(i)  # 在类表中添加当前点
+            if not i in clustered_pts_index:  # 如果该点未被聚过类
+                dst = dists[pt_index * lenth + i]
+                if dst < cluster_thrd: #如果是可聚类的
+                    cluster_list[list_indexed].append(i)  # 在聚类表中添加当前点
+                    clustered_pts_index.append(i)  #在已聚过类的表中添加当前点
     result=[]
     for clst in cluster_list:  #清理类中的重复点
         if len(clst)>0:

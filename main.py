@@ -418,7 +418,7 @@ class main_ui:
 
     def video_loop_diff(self, video_th, panel, url, cam_id):
         print("process for video", video_th, "  ", url)
-        # cap = cv2.VideoCapture(url)
+        #cap = cv2.VideoCapture(url)
         cap = cv2.VideoCapture(0)
         now_time = int(round(time.time() * 1000))
         self.start_time[video_th] = int(now_time)
@@ -550,9 +550,7 @@ class main_ui:
                             for pts_index in clst_result[i]:
                                 clustered_pts.append([pts[pts_index]])
                                 strs=strs+str(pts_index)+" "
-                            cv2.putText(img_dis,
-                                    strs,
-                                    (50, (i+1)*50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                            #cv2.putText(img_dis,  strs, (50, (i+1)*50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                             xs, ys, ws, hs = cv2.boundingRect(np.array(clustered_pts)) #聚类点找矩形外框
 
 
