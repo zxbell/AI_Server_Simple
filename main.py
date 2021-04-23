@@ -14,6 +14,9 @@ import datetime
 import matplotlib.pyplot as plt
 import pylab
 import funcs
+import detect_yolo
+import torch
+import models
 
 
 class main_ui:
@@ -72,6 +75,11 @@ class main_ui:
         for i in range(len(self.ai_ip)):
             self.ai_rec.append([])
         self.tcp_server_process = None
+
+        self.args,self.classes=detect_yolo.yolo_prepare()
+        self.model = models.load_model(self.args.model, self.args.weights)
+        self.model.eval()  # Set model to evaluation mode
+        self.Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
     def ui_menu(self):
         # 创建一个顶级菜单
@@ -415,6 +423,9 @@ class main_ui:
             master.after(50, self.display, master, panel)
             # self.display(master, panel)
         # print("quit display")
+    def yolo_detect(self,img):
+        lable='Not found'
+        return lable
 
     def video_loop_diff(self, video_th, panel, url, cam_id):
         print("process for video", video_th, "  ", url)
@@ -552,13 +563,27 @@ class main_ui:
                 # cv2.drawContours(cv2img, contours, -1, color=(0, 0, 255), thickness=3, maxLevel=2)
 
                 cv2img = cv2.resize(cv2img, (width, height))
+
+                img_detections = []
+                detections=detect_yolo.detect_image(self.model,cv2img)
+                if len(detections)>0:
+                    img_detections.extend(detections)
+                    print(img_detections[0])
+                    [x1, y1, x2, y2, conf, cls_pred]=img_detections[0]
+                    print(f"\t+ Label: {self.classes[int(cls_pred)]} | Confidence: {conf.item():0.4f}")
+
+                    cv2.rectangle(cv2img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 255, 0), 2)
+
                 img_ = Image.fromarray(cv2img)  # 转成PIL
 
-                draw = ImageDraw.Draw(img_)  # 图片上打印
-                # time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
 
-                # draw.text((width - 300, 80), time_string, (0, 255, 0),
-                #          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
+                draw = ImageDraw.Draw(img_)  # 图片上打印
+                if len(detections) > 0:
+                    draw.text((x1, y1), '识别: ' + str(self.classes[int(cls_pred)]), (255, 255, 0), font=font)
+                time_string=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(self.current_time[video_th]/1000)))
+
+                draw.text((width - 300, 80), time_string, (0, 255, 0),
+                          font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
 
                 draw.text((width - 80, height - 20), 'FPS: ' + str(fps), (0, 255, 0),
                           font=font)  # 参数1：打印坐标，参数2：文本，参数3：字体颜色，参数4：字体
